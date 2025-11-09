@@ -28,14 +28,15 @@ class GeminiClient:
         genai.configure(api_key=api_key)
 
         # Model selection based on processing mode
-        # Using Gemini 2.5 models (latest as of Jan 2025)
+        # Using stable Gemini models that work with the API
         if settings.processing.accuracy_mode == "speed":
-            self.model_name = "gemini-2.5-flash-latest"
+            self.model_name = "gemini-1.5-flash"
         else:
-            self.model_name = "gemini-2.5-pro-latest"
+            self.model_name = "gemini-1.5-pro"
 
         self.model = genai.GenerativeModel(self.model_name)
-        self.vision_model = genai.GenerativeModel('gemini-2.5-pro-latest')
+        # For vision tasks, use pro model with vision capabilities
+        self.vision_model = genai.GenerativeModel('gemini-1.5-pro')
 
     def extract_text_from_image(self, image_path: Path) -> Tuple[str, str]:
         """Extract text and generate alt text from an image.
