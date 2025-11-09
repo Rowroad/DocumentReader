@@ -27,16 +27,49 @@ class GeminiClient:
         self.settings = settings
         genai.configure(api_key=api_key)
 
-        # Model selection based on processing mode
-        # Using stable Gemini models that work with the API
-        if settings.processing.accuracy_mode == "speed":
-            self.model_name = "gemini-1.5-flash"
-        else:
-            self.model_name = "gemini-1.5-pro"
+        # Try to list available models for debugging
+        try:
+            available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+            print(f"Available Gemini models: {available_models}")
+        except Exception as e:
+            print(f"Warning: Could not list models: {e}")
+            available_models = []
 
+        # Model selection - try different model names until one works
+        if settings.processing.accuracy_mode == "speed":
+            model_options = [
+                "gemini-1.5-flash-latest",
+                "models/gemini-1.5-flash-latest",
+                "gemini-1.5-flash",
+                "models/gemini-1.5-flash",
+                "gemini-pro"
+            ]
+        else:
+            model_options = [
+                "gemini-1.5-pro-latest",
+                "models/gemini-1.5-pro-latest",
+                "gemini-1.5-pro",
+                "models/gemini-1.5-pro",
+                "gemini-pro-vision",
+                "gemini-pro"
+            ]
+
+        # Find first available model
+        self.model_name = model_options[0]
+        if available_models:
+            for option in model_options:
+                # Check if model exists in available list
+                if option in available_models:
+                    self.model_name = option
+                    break
+                # Check without "models/" prefix
+                elif f"models/{option}" in available_models:
+                    self.model_name = option
+                    break
+
+        print(f"Using model: {self.model_name}")
         self.model = genai.GenerativeModel(self.model_name)
-        # For vision tasks, use pro model with vision capabilities
-        self.vision_model = genai.GenerativeModel('gemini-1.5-pro')
+        self.vision_model = genai.GenerativeModel(self.model_name)
 
     def extract_text_from_image(self, image_path: Path) -> Tuple[str, str]:
         """Extract text and generate alt text from an image.
