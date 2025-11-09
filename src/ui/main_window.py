@@ -3,11 +3,11 @@
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
     QTreeWidget, QTreeWidgetItem, QTabWidget, QProgressBar,
-    QFileDialog, QMenuBar, QMenu, QStatusBar, QLabel, QComboBox
+    QFileDialog, QMenuBar, QMenu, QStatusBar, QLabel, QComboBox,
+    QTextEdit
 )
-from PyQt6.QtWebEngineWidgets import QWebEngineView
-from PyQt6.QtCore import Qt, pyqtSignal, QThread, QUrl
-from PyQt6.QtGui import QKeySequence, QAction
+from PyQt6.QtCore import Qt, pyqtSignal, QThread
+from PyQt6.QtGui import QKeySequence, QAction, QTextCursor
 from pathlib import Path
 import os
 
@@ -114,15 +114,17 @@ class DocumentTab(QWidget):
 
         splitter.addWidget(self.tree_widget)
 
-        # Document content view (web view for accessibility)
-        self.web_view = QWebEngineView()
-        self.web_view.setAccessibleName(f"{self.document.title} content")
-        self.web_view.setAccessibleDescription("Document content view")
+        # Document content view (read-only text edit for accessibility)
+        self.content_view = QTextEdit()
+        self.content_view.setReadOnly(True)
+        self.content_view.setAccessibleName(f"{self.document.title} content")
+        self.content_view.setAccessibleDescription("Document content view - read only")
+        self.content_view.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
 
-        # Load document content as HTML
+        # Load document content as text
         self.load_document_content()
 
-        splitter.addWidget(self.web_view)
+        splitter.addWidget(self.content_view)
 
         # Set splitter sizes (30% tree, 70% content)
         splitter.setSizes([300, 700])
@@ -167,94 +169,110 @@ class DocumentTab(QWidget):
             self.add_tree_item(child, item)
 
     def load_document_content(self):
-        """Load document content into web view."""
-        # Generate HTML with accessibility features
-        html = self.generate_accessible_html()
-        self.web_view.setHtml(html, QUrl.fromLocalFile(str(self.document.file_path)))
+        """Load document content into text view."""
+        # Generate formatted text with accessibility features
+        text = self.generate_accessible_text()
+        self.content_view.setPlainText(text)
 
-    def generate_accessible_html(self) -> str:
-        """Generate accessible HTML for document."""
-        html = f"""<!DOCTYPE html>
-<html lang="{self.document.language}">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{self.document.title}</title>
-    <style>
-        body {{
-            font-family: Arial, sans-serif;
-            line-height: 1.6;
-            margin: 20px;
-            max-width: 800px;
-        }}
-        h1, h2, h3, h4, h5, h6 {{
-            margin-top: 1.5em;
-            margin-bottom: 0.5em;
-        }}
-        p {{
-            margin-bottom: 1em;
-        }}
-        .metadata {{
-            background: #f5f5f5;
-            padding: 10px;
-            border-radius: 5px;
-            margin-bottom: 20px;
-        }}
-    </style>
-</head>
-<body>
-    <main role="main">
-        <h1>{self.document.title}</h1>
-"""
+        # Store section positions for navigation
+        self.section_positions = {}
+        if self.document.structure:
+            self._calculate_section_positions()
+
+    def generate_accessible_text(self) -> str:
+        """Generate accessible plain text for document."""
+        lines = []
+
+        # Title
+        lines.append("=" * 80)
+        lines.append(self.document.title.upper())
+        lines.append("=" * 80)
+        lines.append("")
 
         # Metadata
         if self.document.metadata:
-            html += '        <div class="metadata" role="contentinfo">\n'
             if 'author' in self.document.metadata:
-                html += f'            <p><strong>Author:</strong> {self.document.metadata["author"]}</p>\n'
+                lines.append(f"Author: {self.document.metadata['author']}")
             if 'description' in self.document.metadata:
-                html += f'            <p><strong>Description:</strong> {self.document.metadata["description"]}</p>\n'
-            html += '        </div>\n'
+                lines.append(f"Description: {self.document.metadata['description']}")
+            lines.append("")
+            lines.append("-" * 80)
+            lines.append("")
 
         # Content with structure
         if self.document.structure:
             for section in self.document.structure:
-                html += self.section_to_html(section)
+                lines.extend(self._section_to_text(section, level=1))
         else:
             # Plain content
-            content = self.document.content.replace('\n', '<br>')
-            html += f'        <div>{content}</div>\n'
+            lines.append(self.document.content)
 
-        html += """    </main>
-</body>
-</html>"""
+        return '\n'.join(lines)
 
-        return html
-
-    def section_to_html(self, section, level: int = 1) -> str:
-        """Convert a section to HTML.
+    def _section_to_text(self, section, level: int = 1) -> list:
+        """Convert a section to text lines.
 
         Args:
             section: DocumentStructure object
             level: Heading level
 
         Returns:
-            HTML string
+            List of text lines
         """
-        html = f'        <section id="{section.id}">\n'
-        html += f'            <h{level}>{section.title}</h{level}>\n'
+        lines = []
 
+        # Add heading with markers for the level
+        if level == 1:
+            lines.append("")
+            lines.append("=" * 80)
+            lines.append(section.title.upper())
+            lines.append("=" * 80)
+        elif level == 2:
+            lines.append("")
+            lines.append(section.title)
+            lines.append("-" * len(section.title))
+        else:
+            lines.append("")
+            prefix = "  " * (level - 2)
+            lines.append(f"{prefix}{'*' * level} {section.title}")
+
+        lines.append("")
+
+        # Add content
         if section.content:
-            content = section.content.replace('\n', '<br>')
-            html += f'            <div>{content}</div>\n'
+            # Indent content based on level
+            indent = "  " * (level - 1)
+            for line in section.content.split('\n'):
+                if line.strip():
+                    lines.append(f"{indent}{line}")
+                else:
+                    lines.append("")
 
-        # Children
+        # Add children
         for child in section.children:
-            html += self.section_to_html(child, min(level + 1, 6))
+            lines.extend(self._section_to_text(child, level + 1))
 
-        html += '        </section>\n'
+        return lines
 
-        return html
+    def _calculate_section_positions(self):
+        """Calculate text positions for each section for navigation."""
+        text = self.content_view.toPlainText()
+        lines = text.split('\n')
+
+        def find_section(section, start_line=0):
+            # Look for section title in the text
+            for i in range(start_line, len(lines)):
+                if section.title in lines[i]:
+                    # Calculate character position
+                    char_pos = sum(len(line) + 1 for line in lines[:i])
+                    self.section_positions[section.id] = char_pos
+                    # Recursively find children
+                    for child in section.children:
+                        find_section(child, i + 1)
+                    break
+
+        for section in self.document.structure:
+            find_section(section)
 
     def on_tree_item_clicked(self, item: QTreeWidgetItem, column: int):
         """Handle tree item click to navigate to section.
@@ -264,10 +282,13 @@ class DocumentTab(QWidget):
             column: Column index
         """
         section_id = item.data(0, Qt.ItemDataRole.UserRole)
-        if section_id:
-            # Navigate to section in web view
-            script = f"document.getElementById('{section_id}').scrollIntoView({{behavior: 'smooth'}});"
-            self.web_view.page().runJavaScript(script)
+        if section_id and section_id in self.section_positions:
+            # Navigate to section in text view
+            cursor = self.content_view.textCursor()
+            cursor.setPosition(self.section_positions[section_id])
+            self.content_view.setTextCursor(cursor)
+            self.content_view.ensureCursorVisible()
+            self.content_view.setFocus()
 
 
 class MainWindow(QMainWindow):
