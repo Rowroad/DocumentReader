@@ -3,7 +3,7 @@
 import os
 import re
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional, List, Dict
 import uuid
 
 import PyPDF2
