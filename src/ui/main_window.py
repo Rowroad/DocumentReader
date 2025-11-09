@@ -296,9 +296,16 @@ class MainWindow(QMainWindow):
         self.current_document = None
         self.open_documents = {}  # tab_index -> Document
 
+        # Menu actions (to enable/disable based on state)
+        self.close_tab_action = None
+        self.conversion_actions = []
+
         self.setup_ui()
         self.create_menus()
         self.apply_settings()
+
+        # Update menu states initially (no documents open)
+        self.update_menu_states()
 
     def load_settings(self):
         """Load application settings."""
@@ -388,14 +395,14 @@ class MainWindow(QMainWindow):
 
         file_menu.addSeparator()
 
-        close_tab_action = create_accessible_action(
+        self.close_tab_action = create_accessible_action(
             "&Close Tab",
             KeyboardShortcuts.CLOSE_TAB,
             "Close current tab",
             self
         )
-        close_tab_action.triggered.connect(self.close_current_tab)
-        file_menu.addAction(close_tab_action)
+        self.close_tab_action.triggered.connect(self.close_current_tab)
+        file_menu.addAction(self.close_tab_action)
 
         file_menu.addSeparator()
 
@@ -489,6 +496,7 @@ class MainWindow(QMainWindow):
             )
             action.triggered.connect(lambda checked, f=fmt: self.convert_document(f))
             menu.addAction(action)
+            self.conversion_actions.append(action)  # Store for enabling/disabling
 
     def open_document(self):
         """Open a document file."""
@@ -555,6 +563,9 @@ class MainWindow(QMainWindow):
 
         self.open_documents[tab_index] = document
         self.current_document = document
+
+        # Update menu states now that we have a document
+        self.update_menu_states()
 
     def on_processing_error(self, error: str):
         """Handle processing error.
@@ -682,6 +693,9 @@ class MainWindow(QMainWindow):
         else:
             self.current_document = None
 
+        # Update menu states after closing tab
+        self.update_menu_states()
+
     def close_current_tab(self):
         """Close the current tab."""
         current_index = self.tab_widget.currentIndex()
@@ -700,6 +714,18 @@ class MainWindow(QMainWindow):
         else:
             self.current_document = None
             self.status_label.setText("Ready")
+
+    def update_menu_states(self):
+        """Update menu item enabled/disabled states based on current document."""
+        has_document = self.current_document is not None
+
+        # Enable/disable close tab action
+        if self.close_tab_action:
+            self.close_tab_action.setEnabled(has_document)
+
+        # Enable/disable all conversion actions
+        for action in self.conversion_actions:
+            action.setEnabled(has_document)
 
     def show_preferences(self):
         """Show preferences dialog."""

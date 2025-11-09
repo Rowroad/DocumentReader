@@ -257,6 +257,14 @@ class PreferencesDialog(QDialog):
         pitch_label.setBuddy(self.pitch_spinner)
         layout.addRow(pitch_label, self.pitch_spinner)
 
+        # Test TTS button
+        test_tts_btn = AccessibleButton(
+            "Test Voice",
+            description="Play a sample with current TTS settings"
+        )
+        test_tts_btn.clicked.connect(self.test_tts_settings)
+        layout.addRow("", test_tts_btn)
+
         # Note label (should not receive focus)
         note_label = QLabel("Note: TTS requires Google Cloud Text-to-Speech API")
         note_label.setFocusPolicy(Qt.FocusPolicy.NoFocus)
@@ -449,3 +457,82 @@ class PreferencesDialog(QDialog):
         """Reset system prompt to default."""
         default_prompt = Settings.get_default_system_prompt()
         self.system_prompt_input.setPlainText(default_prompt)
+
+    def test_tts_settings(self):
+        """Test the current TTS settings with a sample."""
+        from pathlib import Path
+        import tempfile
+        from ..processing import GeminiClient
+        from ..utils import ErrorHandler
+
+        # Sample text to test
+        sample_text = "Hello! This is a test of the text to speech settings. You are listening to the selected voice with the current speed and pitch settings."
+
+        # Get current settings
+        voice = self.voice_combo.currentText()
+        language = self.tts_language_input.text() or "en-US"
+        speed = self.speed_spinner.value()
+        pitch = self.pitch_spinner.value()
+
+        try:
+            # Check if API key is set
+            api_key = self.api_key_input.text()
+            if not api_key:
+                from ..utils import ErrorSeverity
+                ErrorHandler.show_error_dialog(
+                    self,
+                    "API Key Required",
+                    "Please enter your Gemini API key first.",
+                    severity=ErrorSeverity.WARNING
+                )
+                return
+
+            # Create temporary settings with current TTS values
+            from ..models import TTSSettings
+            temp_tts = TTSSettings(
+                voice=voice,
+                speed=speed,
+                language=language,
+                pitch=pitch
+            )
+
+            # Update settings temporarily
+            original_tts = self.settings.tts
+            self.settings.tts = temp_tts
+
+            # Create Gemini client
+            try:
+                gemini_client = GeminiClient(api_key, self.settings)
+
+                # Create temp file for audio
+                with tempfile.NamedTemporaryFile(suffix='.mp3', delete=False) as tmp_file:
+                    temp_audio_path = Path(tmp_file.name)
+
+                # Generate TTS
+                gemini_client.generate_tts_audio(sample_text, temp_audio_path)
+
+                # Play the audio (on Windows)
+                import os
+                if os.name == 'nt':  # Windows
+                    os.startfile(str(temp_audio_path))
+                else:
+                    # For other platforms, show message
+                    ErrorHandler.show_info_dialog(
+                        self,
+                        "TTS Test",
+                        f"Audio generated successfully at:\n{temp_audio_path}\n\nPlease open the file manually to listen."
+                    )
+
+            except NotImplementedError:
+                ErrorHandler.handle_tts_not_available(self)
+            finally:
+                # Restore original TTS settings
+                self.settings.tts = original_tts
+
+        except Exception as e:
+            ErrorHandler.show_error_dialog(
+                self,
+                "TTS Test Error",
+                "Failed to test TTS settings.",
+                details=str(e)
+            )
