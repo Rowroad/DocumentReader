@@ -59,6 +59,9 @@ class AccessibleLabel(QLabel, AccessibleWidget):
             role="label"
         )
 
+        # Labels should not receive keyboard focus
+        self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+
         if for_widget:
             self.setBuddy(for_widget)
 

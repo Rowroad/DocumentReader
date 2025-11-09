@@ -257,7 +257,10 @@ class PreferencesDialog(QDialog):
         pitch_label.setBuddy(self.pitch_spinner)
         layout.addRow(pitch_label, self.pitch_spinner)
 
-        layout.addRow(QLabel("Note: TTS requires Google Cloud Text-to-Speech API"))
+        # Note label (should not receive focus)
+        note_label = QLabel("Note: TTS requires Google Cloud Text-to-Speech API")
+        note_label.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        layout.addRow(note_label)
 
         return widget
 

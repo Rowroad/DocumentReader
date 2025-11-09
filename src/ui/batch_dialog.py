@@ -103,6 +103,7 @@ class BatchConvertDialog(QDialog):
         )
         instructions.setWordWrap(True)
         instructions.setAccessibleName("Instructions")
+        instructions.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         layout.addWidget(instructions)
 
         # File list
@@ -176,6 +177,7 @@ class BatchConvertDialog(QDialog):
 
         self.output_dir_label = QLabel(self.settings.output_directory)
         self.output_dir_label.setAccessibleName("Output Directory Path")
+        self.output_dir_label.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         dir_layout.addWidget(self.output_dir_label)
 
         browse_dir_btn = AccessibleButton(
@@ -198,6 +200,7 @@ class BatchConvertDialog(QDialog):
 
         self.status_label = QLabel("")
         self.status_label.setAccessibleName("Status")
+        self.status_label.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.status_label.setVisible(False)
         layout.addWidget(self.status_label)
 

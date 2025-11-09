@@ -356,6 +356,7 @@ class MainWindow(QMainWindow):
 
         self.status_label = QLabel("Ready")
         self.status_label.setAccessibleName("Status")
+        self.status_label.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.status_bar.addWidget(self.status_label)
 
     def create_menus(self):
