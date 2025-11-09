@@ -702,9 +702,20 @@ class MainWindow(QMainWindow):
 
     def show_preferences(self):
         """Show preferences dialog."""
-        dialog = PreferencesDialog(self.settings, self)
-        dialog.settings_changed.connect(self.on_settings_changed)
-        dialog.exec()
+        try:
+            dialog = PreferencesDialog(self.settings, self)
+            dialog.settings_changed.connect(self.on_settings_changed)
+            dialog.exec()
+        except Exception as e:
+            import traceback
+            error_msg = f"Error opening preferences:\n{str(e)}\n\nTraceback:\n{traceback.format_exc()}"
+            print(error_msg)
+            ErrorHandler.show_error_dialog(
+                self,
+                "Preferences Error",
+                "Failed to open preferences dialog.",
+                details=error_msg
+            )
 
     def on_settings_changed(self, settings: Settings):
         """Handle settings change.
