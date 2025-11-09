@@ -25,9 +25,6 @@ def main():
     app.setOrganizationName("DocumentReader")
     app.setApplicationVersion("1.0.0")
 
-    # Set application-wide accessibility attributes
-    app.setAttribute(Qt.ApplicationAttribute.AA_UseHighDpiPixmaps)
-
     # Create and show main window
     window = MainWindow()
     window.show()
