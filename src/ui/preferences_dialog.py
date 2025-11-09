@@ -142,7 +142,6 @@ class PreferencesDialog(QDialog):
         reset_prompt_btn.clicked.connect(self.reset_system_prompt)
         layout.addRow("", reset_prompt_btn)
 
-        layout.addStretch()
         return widget
 
     def create_processing_tab(self) -> QWidget:
