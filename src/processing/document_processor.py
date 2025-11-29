@@ -21,12 +21,12 @@ from .gemini_client import GeminiClient
 class DocumentProcessor:
     """Processes various document formats."""
 
-    def __init__(self, settings: Settings, gemini_client: GeminiClient):
+    def __init__(self, settings: Settings, gemini_client: Optional[GeminiClient] = None):
         """Initialize the document processor.
 
         Args:
             settings: Application settings
-            gemini_client: Gemini API client
+            gemini_client: Gemini API client (optional, required only for AI processing)
         """
         self.settings = settings
         self.gemini = gemini_client
@@ -95,28 +95,35 @@ class DocumentProcessor:
 
         # Process with Gemini for structure and enhancement (if enabled)
         if content and use_gemini:
-            try:
-                processed = self.gemini.process_document_content(
-                    content, file_path, custom_instructions
-                )
+            if not self.gemini:
+                # Gemini client not available, fall back to direct reading
+                print("Warning: Gemini client not available, using direct reading mode")
+                use_gemini = False
+            else:
+                try:
+                    processed = self.gemini.process_document_content(
+                        content, file_path, custom_instructions
+                    )
 
-                doc.title = processed.get('title', doc.title)
-                doc.language = processed.get('language', 'en')
-                doc.metadata = processed.get('metadata', {})
-                doc.content = processed.get('processed_content', content)
+                    doc.title = processed.get('title', doc.title)
+                    doc.language = processed.get('language', 'en')
+                    doc.metadata = processed.get('metadata', {})
+                    doc.content = processed.get('processed_content', content)
 
-                # Convert structure
-                structure_data = processed.get('structure', [])
-                doc.structure = self._convert_structure(structure_data)
+                    # Convert structure
+                    structure_data = processed.get('structure', [])
+                    doc.structure = self._convert_structure(structure_data)
 
-                # Detect language if needed
-                if not doc.language:
-                    doc.language = self.gemini.detect_language(content[:1000])
+                    # Detect language if needed
+                    if not doc.language:
+                        doc.language = self.gemini.detect_language(content[:1000])
 
-            except Exception as e:
-                print(f"Warning: Gemini processing failed: {e}")
-                # Continue with raw content
-        elif content and not use_gemini:
+                except Exception as e:
+                    print(f"Warning: Gemini processing failed: {e}")
+                    # Continue with raw content
+                    use_gemini = False
+
+        if content and not use_gemini:
             # Direct reading mode - try to detect basic structure from content
             doc.language = 'en'  # Default language
             doc.structure = self._detect_simple_structure(content)

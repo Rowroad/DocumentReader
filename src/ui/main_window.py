@@ -316,16 +316,21 @@ class MainWindow(QMainWindow):
 
     def init_clients(self):
         """Initialize API clients."""
+        # Always initialize the processor (it can work without Gemini for direct reading)
+        self.processor = DocumentProcessor(
+            self.settings,
+            None  # Will be set if API key is available
+        )
+
         if self.settings.gemini_api_key:
             try:
                 self.gemini_client = GeminiClient(
                     self.settings.gemini_api_key,
                     self.settings
                 )
-                self.processor = DocumentProcessor(
-                    self.settings,
-                    self.gemini_client
-                )
+                # Update processor with Gemini client
+                self.processor.gemini = self.gemini_client
+
                 self.converter = FormatConverter(
                     self.settings,
                     self.gemini_client

@@ -173,15 +173,31 @@ class TTSManager:
 
             voice_list = []
             for i in range(voices.Count):
-                voice = voices.Item(i)
-                voice_list.append(voice.GetDescription())
+                try:
+                    voice = voices.Item(i)
+                    # Try different methods to get the voice name
+                    try:
+                        name = voice.GetDescription()
+                    except:
+                        # Fallback: try accessing the name attribute directly
+                        name = str(voice.GetAttribute("Name"))
 
+                    if name:
+                        voice_list.append(name)
+                except Exception as voice_error:
+                    print(f"Error getting voice {i}: {voice_error}")
+                    continue
+
+            print(f"Found {len(voice_list)} SAPI 5 voices: {voice_list}")
             return voice_list
 
         except ImportError:
+            print("Error: pywin32 not installed")
             return []
         except Exception as e:
+            import traceback
             print(f"Error getting SAPI 5 voices: {e}")
+            print(traceback.format_exc())
             return []
 
     def is_sapi5_available(self) -> bool:
