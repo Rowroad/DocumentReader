@@ -32,12 +32,14 @@ class DocumentProcessor:
         self.gemini = gemini_client
 
     def process_file(self, file_path: Path,
-                    custom_instructions: str = "") -> Document:
+                    custom_instructions: str = "",
+                    use_gemini: bool = True) -> Document:
         """Process a file and extract its content.
 
         Args:
             file_path: Path to the file
             custom_instructions: Optional custom processing instructions
+            use_gemini: Whether to use Gemini AI for processing (default True)
 
         Returns:
             Processed Document object
@@ -91,8 +93,8 @@ class DocumentProcessor:
             images=images
         )
 
-        # Process with Gemini for structure and enhancement
-        if content:
+        # Process with Gemini for structure and enhancement (if enabled)
+        if content and use_gemini:
             try:
                 processed = self.gemini.process_document_content(
                     content, file_path, custom_instructions
@@ -114,6 +116,10 @@ class DocumentProcessor:
             except Exception as e:
                 print(f"Warning: Gemini processing failed: {e}")
                 # Continue with raw content
+        elif content and not use_gemini:
+            # Direct reading mode - try to detect basic structure from content
+            doc.language = 'en'  # Default language
+            doc.structure = self._detect_simple_structure(content)
 
         doc.processed = True
         return doc
@@ -387,5 +393,79 @@ class DocumentProcessor:
                 struct.children = self._convert_structure(item['children'])
 
             result.append(struct)
+
+        return result
+
+    def _detect_simple_structure(self, content: str) -> List[DocumentStructure]:
+        """Detect basic structure from content without AI.
+
+        Uses simple heuristics to find headings:
+        - Lines that are all caps
+        - Lines followed by ===== or -----
+        - Lines starting with Chapter, Part, Section, etc.
+        - Markdown-style # headings
+
+        Args:
+            content: Document content
+
+        Returns:
+            List of DocumentStructure objects
+        """
+        result = []
+        lines = content.split('\n')
+
+        i = 0
+        section_counter = 0
+
+        while i < len(lines):
+            line = lines[i].strip()
+
+            # Skip empty lines
+            if not line:
+                i += 1
+                continue
+
+            # Check for underlined headings (next line is ==== or ----)
+            is_heading = False
+            level = 2
+
+            if i + 1 < len(lines):
+                next_line = lines[i + 1].strip()
+                if next_line and all(c == '=' for c in next_line) and len(next_line) >= 3:
+                    is_heading = True
+                    level = 1
+                    i += 1  # Skip the underline
+                elif next_line and all(c == '-' for c in next_line) and len(next_line) >= 3:
+                    is_heading = True
+                    level = 2
+                    i += 1  # Skip the underline
+
+            # Check for markdown headings
+            if line.startswith('#'):
+                is_heading = True
+                level = len(line) - len(line.lstrip('#'))
+                line = line.lstrip('#').strip()
+
+            # Check for chapter/section markers
+            if re.match(r'^(Chapter|CHAPTER|Part|PART|Section|SECTION)\s+\d+', line):
+                is_heading = True
+                level = 1
+
+            # Check for all-caps lines (potential headings)
+            elif len(line) > 3 and line.isupper() and not line.endswith('.'):
+                is_heading = True
+                level = 2
+
+            if is_heading and line:
+                section_counter += 1
+                struct = DocumentStructure(
+                    id=f"section_{section_counter}",
+                    title=line,
+                    level=min(level, 6),
+                    content=""
+                )
+                result.append(struct)
+
+            i += 1
 
         return result

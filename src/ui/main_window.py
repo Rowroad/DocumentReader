@@ -3,9 +3,8 @@
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
     QTreeWidget, QTreeWidgetItem, QTabWidget, QProgressBar,
-    QFileDialog, QMenuBar, QMenu, QStatusBar, QLabel, QComboBox
+    QFileDialog, QMenuBar, QMenu, QStatusBar, QLabel, QComboBox, QTextBrowser
 )
-from PyQt6.QtWebEngineWidgets import QWebEngineView
 from PyQt6.QtCore import Qt, pyqtSignal, QThread, QUrl
 from PyQt6.QtGui import QKeySequence, QAction
 from pathlib import Path
@@ -28,20 +27,25 @@ class ProcessingThread(QThread):
     processing_error = pyqtSignal(str)
 
     def __init__(self, processor: DocumentProcessor, file_path: Path,
-                 custom_instructions: str = ""):
+                 custom_instructions: str = "", use_gemini: bool = True):
         super().__init__()
         self.processor = processor
         self.file_path = file_path
         self.custom_instructions = custom_instructions
+        self.use_gemini = use_gemini
 
     def run(self):
         """Run the processing."""
         try:
-            self.progress_update.emit(10, "Loading document...")
+            if self.use_gemini:
+                self.progress_update.emit(10, "Processing with AI...")
+            else:
+                self.progress_update.emit(10, "Loading document...")
 
             document = self.processor.process_file(
                 self.file_path,
-                self.custom_instructions
+                self.custom_instructions,
+                self.use_gemini
             )
 
             self.progress_update.emit(100, "Complete")
@@ -114,15 +118,21 @@ class DocumentTab(QWidget):
 
         splitter.addWidget(self.tree_widget)
 
-        # Document content view (web view for accessibility)
-        self.web_view = QWebEngineView()
-        self.web_view.setAccessibleName(f"{self.document.title} content")
-        self.web_view.setAccessibleDescription("Document content view")
+        # Document content view (text browser for better keyboard navigation)
+        self.text_browser = QTextBrowser()
+        self.text_browser.setAccessibleName(f"{self.document.title} content")
+        self.text_browser.setAccessibleDescription("Document content view")
+        self.text_browser.setOpenExternalLinks(False)
+        self.text_browser.setOpenLinks(True)
+
+        # Enable keyboard navigation
+        self.text_browser.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self.text_browser.setReadOnly(True)
 
         # Load document content as HTML
         self.load_document_content()
 
-        splitter.addWidget(self.web_view)
+        splitter.addWidget(self.text_browser)
 
         # Set splitter sizes (30% tree, 70% content)
         splitter.setSizes([300, 700])
@@ -167,10 +177,10 @@ class DocumentTab(QWidget):
             self.add_tree_item(child, item)
 
     def load_document_content(self):
-        """Load document content into web view."""
+        """Load document content into text browser."""
         # Generate HTML with accessibility features
         html = self.generate_accessible_html()
-        self.web_view.setHtml(html, QUrl.fromLocalFile(str(self.document.file_path)))
+        self.text_browser.setHtml(html)
 
     def generate_accessible_html(self) -> str:
         """Generate accessible HTML for document."""
@@ -265,9 +275,8 @@ class DocumentTab(QWidget):
         """
         section_id = item.data(0, Qt.ItemDataRole.UserRole)
         if section_id:
-            # Navigate to section in web view
-            script = f"document.getElementById('{section_id}').scrollIntoView({{behavior: 'smooth'}});"
-            self.web_view.page().runJavaScript(script)
+            # Navigate to section in text browser using anchor
+            self.text_browser.scrollToAnchor(section_id)
 
 
 class MainWindow(QMainWindow):
@@ -491,11 +500,6 @@ class MainWindow(QMainWindow):
 
     def open_document(self):
         """Open a document file."""
-        if not self.gemini_client:
-            ErrorHandler.handle_missing_api_key(self)
-            self.show_preferences()
-            return
-
         file_path, _ = QFileDialog.getOpenFileName(
             self,
             "Open Document",
@@ -504,16 +508,43 @@ class MainWindow(QMainWindow):
         )
 
         if file_path:
-            self.process_document(Path(file_path))
+            file_path = Path(file_path)
 
-    def process_document(self, file_path: Path, custom_instructions: str = ""):
+            # Determine if this is an image file
+            is_image = file_path.suffix.lower() in ['.jpg', '.jpeg', '.png', '.gif', '.bmp']
+
+            # For non-image files, show processing options dialog
+            use_gemini = True
+            if not is_image:
+                from .processing_dialog import ProcessingOptionsDialog
+                dialog = ProcessingOptionsDialog(file_path.name, self)
+                if dialog.exec():
+                    use_gemini = dialog.get_use_gemini()
+                else:
+                    return  # User cancelled
+
+            # Check API key if Gemini processing is requested
+            if use_gemini and not self.gemini_client:
+                ErrorHandler.handle_missing_api_key(self)
+                self.show_preferences()
+                return
+
+            self.process_document(file_path, use_gemini=use_gemini)
+
+    def process_document(self, file_path: Path, custom_instructions: str = "",
+                        use_gemini: bool = True):
         """Process a document file.
 
         Args:
             file_path: Path to document
             custom_instructions: Optional custom instructions
+            use_gemini: Whether to use Gemini AI processing
         """
-        self.status_label.setText(f"Processing {file_path.name}...")
+        if use_gemini:
+            self.status_label.setText(f"Processing {file_path.name} with AI...")
+        else:
+            self.status_label.setText(f"Loading {file_path.name}...")
+
         self.progress_bar.setVisible(True)
         self.progress_bar.setValue(0)
 
@@ -521,7 +552,8 @@ class MainWindow(QMainWindow):
         self.processing_thread = ProcessingThread(
             self.processor,
             file_path,
-            custom_instructions
+            custom_instructions,
+            use_gemini
         )
         self.processing_thread.progress_update.connect(self.on_processing_progress)
         self.processing_thread.processing_complete.connect(self.on_processing_complete)
