@@ -10,7 +10,9 @@ import os
 @dataclass
 class TTSSettings:
     """Text-to-speech settings."""
-    voice: str = "en-US-Neural2-A"
+    engine: str = "google"  # "google" or "sapi5"
+    voice: str = "en-US-Neural2-A"  # For Google TTS
+    sapi5_voice: str = ""  # For SAPI5 (empty = default voice)
     speed: float = 1.0
     language: str = "en-US"
     pitch: float = 0.0

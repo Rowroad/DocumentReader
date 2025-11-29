@@ -18,6 +18,7 @@ from mutagen.mp4 import MP4, MP4Cover
 
 from ..models import Document, OutputFormat, Settings
 from .gemini_client import GeminiClient
+from .tts_manager import TTSManager
 
 
 class FormatConverter:
@@ -32,6 +33,7 @@ class FormatConverter:
         """
         self.settings = settings
         self.gemini = gemini_client
+        self.tts_manager = TTSManager(settings, gemini_client)
 
     def convert(self, document: Document, output_format: OutputFormat,
                 output_path: Path) -> Path:
@@ -349,7 +351,7 @@ class FormatConverter:
 
                 try:
                     # Generate TTS audio
-                    self.gemini.generate_tts_audio(
+                    self.tts_manager.generate_audio(
                         section.content,
                         audio_path,
                         section.title
@@ -402,7 +404,7 @@ class FormatConverter:
 
                 try:
                     # Generate TTS audio
-                    self.gemini.generate_tts_audio(
+                    self.tts_manager.generate_audio(
                         section.content,
                         audio_path,
                         section.title

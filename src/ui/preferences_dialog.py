@@ -211,8 +211,18 @@ class PreferencesDialog(QDialog):
         widget = QWidget()
         layout = QFormLayout(widget)
 
-        # Voice
-        voice_label = AccessibleLabel("Voice:")
+        # TTS Engine
+        engine_label = AccessibleLabel("TTS Engine:")
+        self.tts_engine_combo = QComboBox()
+        self.tts_engine_combo.addItems(["Google TTS", "SAPI 5 (Windows)"])
+        self.tts_engine_combo.setAccessibleName("TTS Engine")
+        self.tts_engine_combo.setAccessibleDescription("Select text-to-speech engine")
+        self.tts_engine_combo.currentIndexChanged.connect(self.on_tts_engine_changed)
+        engine_label.setBuddy(self.tts_engine_combo)
+        layout.addRow(engine_label, self.tts_engine_combo)
+
+        # Google TTS Voice
+        self.google_voice_label = AccessibleLabel("Google Voice:")
         self.voice_combo = QComboBox()
         self.voice_combo.addItems([
             "en-US-Neural2-A",
@@ -222,10 +232,21 @@ class PreferencesDialog(QDialog):
             "en-GB-Neural2-A",
             "en-GB-Neural2-B"
         ])
-        self.voice_combo.setAccessibleName("TTS Voice")
-        self.voice_combo.setAccessibleDescription("Select text-to-speech voice")
-        voice_label.setBuddy(self.voice_combo)
-        layout.addRow(voice_label, self.voice_combo)
+        self.voice_combo.setAccessibleName("Google TTS Voice")
+        self.voice_combo.setAccessibleDescription("Select Google text-to-speech voice")
+        self.google_voice_label.setBuddy(self.voice_combo)
+        layout.addRow(self.google_voice_label, self.voice_combo)
+
+        # SAPI5 Voice
+        self.sapi5_voice_label = AccessibleLabel("SAPI 5 Voice:")
+        self.sapi5_voice_combo = QComboBox()
+        self.sapi5_voice_combo.setAccessibleName("SAPI 5 Voice")
+        self.sapi5_voice_combo.setAccessibleDescription("Select SAPI 5 voice")
+        self.sapi5_voice_label.setBuddy(self.sapi5_voice_combo)
+        layout.addRow(self.sapi5_voice_label, self.sapi5_voice_combo)
+
+        # Load SAPI5 voices
+        self.load_sapi5_voices()
 
         # Language
         lang_label = AccessibleLabel("Language:")
@@ -258,7 +279,13 @@ class PreferencesDialog(QDialog):
         pitch_label.setBuddy(self.pitch_spinner)
         layout.addRow(pitch_label, self.pitch_spinner)
 
-        layout.addRow(QLabel("Note: TTS requires Google Cloud Text-to-Speech API"))
+        # Note
+        note_label = QLabel(
+            "Note: Google TTS requires Google Cloud Text-to-Speech API. "
+            "SAPI 5 is available on Windows without additional setup."
+        )
+        note_label.setWordWrap(True)
+        layout.addRow(note_label)
 
         return widget
 
@@ -354,12 +381,27 @@ class PreferencesDialog(QDialog):
         )
 
         # TTS
+        # Set TTS engine
+        engine_index = 0 if self.settings.tts.engine == "google" else 1
+        self.tts_engine_combo.setCurrentIndex(engine_index)
+
+        # Set Google voice
         voice_index = self.voice_combo.findText(self.settings.tts.voice)
         if voice_index >= 0:
             self.voice_combo.setCurrentIndex(voice_index)
+
+        # Set SAPI5 voice
+        if self.settings.tts.sapi5_voice:
+            sapi5_index = self.sapi5_voice_combo.findData(self.settings.tts.sapi5_voice)
+            if sapi5_index >= 0:
+                self.sapi5_voice_combo.setCurrentIndex(sapi5_index)
+
         self.tts_language_input.setText(self.settings.tts.language)
         self.speed_spinner.setValue(self.settings.tts.speed)
         self.pitch_spinner.setValue(self.settings.tts.pitch)
+
+        # Update visibility based on engine
+        self.on_tts_engine_changed(engine_index)
 
         # Security
         self.delete_days_spinner.setValue(self.settings.security.auto_delete_days)
@@ -398,7 +440,9 @@ class PreferencesDialog(QDialog):
             self.detect_language_check.isChecked()
 
         # TTS
+        self.settings.tts.engine = "google" if self.tts_engine_combo.currentIndex() == 0 else "sapi5"
         self.settings.tts.voice = self.voice_combo.currentText()
+        self.settings.tts.sapi5_voice = self.sapi5_voice_combo.currentData() or ""
         self.settings.tts.language = self.tts_language_input.text()
         self.settings.tts.speed = self.speed_spinner.value()
         self.settings.tts.pitch = self.pitch_spinner.value()
@@ -447,3 +491,31 @@ class PreferencesDialog(QDialog):
         """Reset system prompt to default."""
         default_prompt = Settings.get_default_system_prompt()
         self.system_prompt_input.setPlainText(default_prompt)
+
+    def on_tts_engine_changed(self, index: int):
+        """Handle TTS engine selection change."""
+        is_google = (index == 0)
+
+        # Show/hide appropriate voice selection
+        self.google_voice_label.setVisible(is_google)
+        self.voice_combo.setVisible(is_google)
+        self.sapi5_voice_label.setVisible(not is_google)
+        self.sapi5_voice_combo.setVisible(not is_google)
+
+    def load_sapi5_voices(self):
+        """Load available SAPI 5 voices."""
+        try:
+            from ..processing.tts_manager import TTSManager
+            tts_manager = TTSManager(self.settings, None)
+
+            voices = tts_manager.get_available_sapi5_voices()
+
+            if voices:
+                self.sapi5_voice_combo.addItem("(Default Voice)", "")
+                for voice in voices:
+                    self.sapi5_voice_combo.addItem(voice, voice)
+            else:
+                self.sapi5_voice_combo.addItem("(No SAPI 5 voices available)", "")
+        except Exception as e:
+            self.sapi5_voice_combo.addItem("(SAPI 5 not available)", "")
+            print(f"Could not load SAPI 5 voices: {e}")
