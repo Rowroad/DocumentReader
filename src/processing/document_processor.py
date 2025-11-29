@@ -124,9 +124,10 @@ class DocumentProcessor:
                     use_gemini = False
 
         if content and not use_gemini:
-            # Direct reading mode - try to detect basic structure from content
+            # Direct reading mode - just use the raw content as-is
+            # Don't try to detect structure, just show the full text
             doc.language = 'en'  # Default language
-            doc.structure = self._detect_simple_structure(content)
+            doc.structure = []  # No structure in direct mode, just show raw content
 
         doc.processed = True
         return doc
