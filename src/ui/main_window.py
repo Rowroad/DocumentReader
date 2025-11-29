@@ -125,18 +125,13 @@ class DocumentTab(QWidget):
         self.text_browser.setOpenExternalLinks(False)
         self.text_browser.setOpenLinks(True)
 
-        # Enable keyboard navigation
+        # Enable keyboard navigation - but keep it simple to avoid freezing
         self.text_browser.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.text_browser.setReadOnly(True)
 
-        # Enable text interaction for cursor movement with arrow keys
-        from PyQt6.QtCore import Qt as QtCore
-        self.text_browser.setTextInteractionFlags(
-            QtCore.TextInteractionFlag.TextSelectableByMouse |
-            QtCore.TextInteractionFlag.TextSelectableByKeyboard |
-            QtCore.TextInteractionFlag.LinksAccessibleByMouse |
-            QtCore.TextInteractionFlag.LinksAccessibleByKeyboard
-        )
+        # Don't set TextSelectableByKeyboard - it causes freezing on large documents
+        # Screen readers will use their own virtual cursor for navigation
+        # Sighted users can use Page Up/Down, Home/End built into QTextBrowser
 
         # Load document content as HTML
         self.load_document_content()
