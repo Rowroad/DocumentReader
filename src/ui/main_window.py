@@ -3,7 +3,7 @@
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
     QTreeWidget, QTreeWidgetItem, QTabWidget, QProgressBar,
-    QFileDialog, QMenuBar, QMenu, QStatusBar, QLabel, QComboBox, QTextBrowser
+    QFileDialog, QMenuBar, QMenu, QStatusBar, QLabel, QComboBox, QTextEdit
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QThread, QUrl
 from PyQt6.QtGui import QKeySequence, QAction
@@ -118,25 +118,18 @@ class DocumentTab(QWidget):
 
         splitter.addWidget(self.tree_widget)
 
-        # Document content view (text browser for better keyboard navigation)
-        self.text_browser = QTextBrowser()
-        self.text_browser.setAccessibleName(f"{self.document.title} content")
-        self.text_browser.setAccessibleDescription("Document content view")
-        self.text_browser.setOpenExternalLinks(False)
-        self.text_browser.setOpenLinks(True)
+        # Document content view - simple read-only text display
+        # Following WCAG/UI Automation guidelines: let screen readers handle navigation
+        self.text_view = QTextEdit()
+        self.text_view.setAccessibleName(f"{self.document.title} content")
+        self.text_view.setAccessibleDescription("Document content view")
+        self.text_view.setReadOnly(True)
+        self.text_view.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
 
-        # Enable keyboard navigation - but keep it simple to avoid freezing
-        self.text_browser.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
-        self.text_browser.setReadOnly(True)
-
-        # Don't set TextSelectableByKeyboard - it causes freezing on large documents
-        # Screen readers will use their own virtual cursor for navigation
-        # Sighted users can use Page Up/Down, Home/End built into QTextBrowser
-
-        # Load document content as HTML
+        # Load document content
         self.load_document_content()
 
-        splitter.addWidget(self.text_browser)
+        splitter.addWidget(self.text_view)
 
         # Set splitter sizes (30% tree, 70% content)
         splitter.setSizes([300, 700])
@@ -181,13 +174,13 @@ class DocumentTab(QWidget):
             self.add_tree_item(child, item)
 
     def load_document_content(self):
-        """Load document content into text browser."""
+        """Load document content into text view."""
         # Generate HTML with accessibility features
         html = self.generate_accessible_html()
-        self.text_browser.setHtml(html)
+        self.text_view.setHtml(html)
 
-        # Set focus to text browser for immediate keyboard navigation
-        self.text_browser.setFocus()
+        # Set focus to text view
+        self.text_view.setFocus()
 
     def generate_accessible_html(self) -> str:
         """Generate accessible HTML for document."""
@@ -280,10 +273,16 @@ class DocumentTab(QWidget):
             item: Clicked tree item
             column: Column index
         """
-        section_id = item.data(0, Qt.ItemDataRole.UserRole)
-        if section_id:
-            # Navigate to section in text browser using anchor
-            self.text_browser.scrollToAnchor(section_id)
+        # Get section title to search for
+        section_title = item.text(0)
+        if section_title:
+            # Move cursor to beginning
+            cursor = self.text_view.textCursor()
+            cursor.movePosition(cursor.MoveOperation.Start)
+            self.text_view.setTextCursor(cursor)
+
+            # Find the section title in the document
+            self.text_view.find(section_title)
 
 
 class MainWindow(QMainWindow):
@@ -329,19 +328,22 @@ class MainWindow(QMainWindow):
             None  # Will be set if API key is available
         )
 
+        # Always initialize the converter (it can work without Gemini for basic conversions)
+        self.converter = FormatConverter(
+            self.settings,
+            None  # Will be set if API key is available
+        )
+
         if self.settings.gemini_api_key:
             try:
                 self.gemini_client = GeminiClient(
                     self.settings.gemini_api_key,
                     self.settings
                 )
-                # Update processor with Gemini client
+                # Update processor and converter with Gemini client
                 self.processor.gemini = self.gemini_client
+                self.converter.gemini = self.gemini_client
 
-                self.converter = FormatConverter(
-                    self.settings,
-                    self.gemini_client
-                )
             except Exception as e:
                 ErrorHandler.handle_api_error(self, str(e))
 

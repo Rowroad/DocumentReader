@@ -284,6 +284,14 @@ class PreferencesDialog(QDialog):
         pitch_label.setBuddy(self.pitch_spinner)
         layout.addRow(pitch_label, self.pitch_spinner)
 
+        # Test Voice Button
+        test_voice_btn = AccessibleButton(
+            "Test Voice",
+            description="Test the selected TTS voice"
+        )
+        test_voice_btn.clicked.connect(self.test_tts_voice)
+        layout.addRow("", test_voice_btn)
+
         # Note
         note_label = QLabel(
             "Note: Google TTS requires Google Cloud Text-to-Speech API. "
@@ -524,3 +532,66 @@ class PreferencesDialog(QDialog):
         except Exception as e:
             self.sapi5_voice_combo.addItem("(SAPI 5 not available)", "")
             print(f"Could not load SAPI 5 voices: {e}")
+
+    def test_tts_voice(self):
+        """Test the currently selected TTS voice."""
+        import tempfile
+        from pathlib import Path
+        from ..processing.tts_manager import TTSManager
+        from ..utils import ErrorHandler
+
+        try:
+            # Get current settings
+            engine = "google" if self.tts_engine_combo.currentIndex() == 0 else "sapi5"
+
+            # Create temporary settings with current values
+            from ..models import Settings, TTSSettings
+            temp_settings = Settings()
+            temp_settings.tts.engine = engine
+            temp_settings.tts.voice = self.voice_combo.currentText()
+            temp_settings.tts.sapi5_voice = self.sapi5_voice_combo.currentData() or ""
+            temp_settings.tts.speed = self.speed_spinner.value()
+            temp_settings.tts.pitch = self.pitch_spinner.value()
+
+            # Create TTS manager
+            tts_manager = TTSManager(temp_settings, None)
+
+            # Test phrase
+            test_text = "This is a test of the selected voice."
+
+            # Create temporary file
+            with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
+                temp_file = Path(tmp.name)
+
+            try:
+                # Generate test audio
+                tts_manager.generate_audio(test_text, temp_file)
+
+                # Play the audio
+                import platform
+                import subprocess
+
+                if platform.system() == "Windows":
+                    # Use built-in Windows media player
+                    subprocess.Popen(["powershell", "-c", f"(New-Object Media.SoundPlayer '{temp_file}').PlaySync()"])
+                else:
+                    # Try to use aplay on Linux or afplay on macOS
+                    try:
+                        subprocess.run(["aplay" if platform.system() == "Linux" else "afplay", str(temp_file)])
+                    except FileNotFoundError:
+                        ErrorHandler.show_info_dialog(
+                            self,
+                            "Test Complete",
+                            f"Audio file generated at: {temp_file}\nPlease play it manually."
+                        )
+            finally:
+                # Clean up temporary file after a delay
+                from PyQt6.QtCore import QTimer
+                QTimer.singleShot(5000, lambda: temp_file.unlink(missing_ok=True))
+
+        except Exception as e:
+            ErrorHandler.show_error_dialog(
+                self,
+                "TTS Test Failed",
+                f"Failed to test TTS voice: {str(e)}"
+            )

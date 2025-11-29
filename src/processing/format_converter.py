@@ -24,12 +24,12 @@ from .tts_manager import TTSManager
 class FormatConverter:
     """Converts documents to various output formats."""
 
-    def __init__(self, settings: Settings, gemini_client: GeminiClient):
+    def __init__(self, settings: Settings, gemini_client: Optional[GeminiClient] = None):
         """Initialize the format converter.
 
         Args:
             settings: Application settings
-            gemini_client: Gemini API client for TTS
+            gemini_client: Gemini API client for TTS (optional)
         """
         self.settings = settings
         self.gemini = gemini_client
