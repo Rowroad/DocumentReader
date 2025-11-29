@@ -212,6 +212,7 @@ class PreferencesDialog(QDialog):
 
         # TTS Engine
         engine_label = AccessibleLabel("TTS Engine:")
+        engine_label.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.tts_engine_combo = QComboBox()
         self.tts_engine_combo.addItems(["Google TTS", "SAPI 5 (Windows)"])
         self.tts_engine_combo.setAccessibleName("TTS Engine")
@@ -222,6 +223,7 @@ class PreferencesDialog(QDialog):
 
         # Google TTS Voice
         self.google_voice_label = AccessibleLabel("Google Voice:")
+        self.google_voice_label.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.voice_combo = QComboBox()
         self.voice_combo.addItems([
             "en-US-Neural2-A",
@@ -238,6 +240,7 @@ class PreferencesDialog(QDialog):
 
         # SAPI5 Voice
         self.sapi5_voice_label = AccessibleLabel("SAPI 5 Voice:")
+        self.sapi5_voice_label.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.sapi5_voice_combo = QComboBox()
         self.sapi5_voice_combo.setAccessibleName("SAPI 5 Voice")
         self.sapi5_voice_combo.setAccessibleDescription("Select SAPI 5 voice")
@@ -249,6 +252,7 @@ class PreferencesDialog(QDialog):
 
         # Language
         lang_label = AccessibleLabel("Language:")
+        lang_label.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.tts_language_input = AccessibleLineEdit(
             label="TTS Language",
             placeholder="e.g., en-US"
@@ -258,6 +262,7 @@ class PreferencesDialog(QDialog):
 
         # Speed
         speed_label = AccessibleLabel("Speed:")
+        speed_label.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.speed_spinner = QDoubleSpinBox()
         self.speed_spinner.setRange(0.5, 2.0)
         self.speed_spinner.setSingleStep(0.1)
@@ -269,6 +274,7 @@ class PreferencesDialog(QDialog):
 
         # Pitch
         pitch_label = AccessibleLabel("Pitch:")
+        pitch_label.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.pitch_spinner = QDoubleSpinBox()
         self.pitch_spinner.setRange(-20.0, 20.0)
         self.pitch_spinner.setSingleStep(1.0)
