@@ -425,8 +425,14 @@ class FormatConverter:
                 except NotImplementedError as e:
                     raise Exception(f"TTS required for M4B generation: {e}")
 
+        # Check if we have any audio segments
+        if not audio_segments:
+            raise Exception("No audio segments generated. Document may not have structure or TTS failed.")
+
         # Concatenate all audio
-        combined = sum(audio_segments)
+        combined = audio_segments[0]
+        for segment in audio_segments[1:]:
+            combined += segment
 
         # Export as M4A
         m4a_path = temp_dir / "temp.m4a"

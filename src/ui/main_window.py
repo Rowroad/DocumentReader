@@ -118,13 +118,19 @@ class DocumentTab(QWidget):
 
         splitter.addWidget(self.tree_widget)
 
-        # Document content view - simple read-only text display
-        # Following WCAG/UI Automation guidelines: let screen readers handle navigation
+        # Document content view - read-only text with full keyboard navigation
         self.text_view = QTextEdit()
         self.text_view.setAccessibleName(f"{self.document.title} content")
         self.text_view.setAccessibleDescription("Document content view")
         self.text_view.setReadOnly(True)
-        self.text_view.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+
+        # Enable full text interaction while keeping read-only
+        # This allows arrow keys, text selection, and accessibility
+        from PyQt6.QtCore import Qt as QtCore
+        self.text_view.setTextInteractionFlags(
+            QtCore.TextInteractionFlag.TextSelectableByMouse |
+            QtCore.TextInteractionFlag.TextSelectableByKeyboard
+        )
 
         # Load document content
         self.load_document_content()
